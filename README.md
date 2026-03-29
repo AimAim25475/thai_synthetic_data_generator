@@ -15,16 +15,18 @@ This project automates the creation and validation of high-quality Thai syntheti
 ## Requirements
 
 - Python 3.8+
-- ~500MB free disk space
-
-### Optional
-- Docker & Docker Compose (for Elasticsearch-based QA evaluation)
-- CUDA GPU (optional; automatically detected and used if available for faster inference)
+- Docker & Docker Compose (for Elasticsearch)
+- CUDA-capable GPU (recommended for Typhoon 3B inference)
+- ~4GB free disk space
 
 ## Installation
 
-### 1. Download/Extract the project
-Ensure you have the project files in a directory.
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/AimAim25475/thai_synthetic_data_generator.git
+cd thai_synthetic_data_generator
+```
 
 ### 2. Create virtual environment
 ```bash
@@ -36,39 +38,223 @@ source .venv/bin/activate  # macOS/Linux
 ### 3. Install dependencies
 ```bash
 pip install -r chitchat_api/requirements.txt
-pip install jupyter ipykernel
 ```
 
-### 4. (Optional) Start Elasticsearch for QA evaluation
+### 4. Start Elasticsearch (required for QA evaluation)
 ```bash
 docker-compose -f chitchat_api/docker-compose.yml up -d
 ```
-*Note: Elasticsearch is optional. The pipeline runs without it.*
 
 ## Quick Start
 
-### Run the complete pipeline
-1. Navigate to project directory
-2. Activate virtual environment: `.venv\Scripts\activate`
-3. Launch Jupyter: `jupyter notebook`
-4. Open `Thai_synthetic_data_generated.ipynb`
-5. Run all cells sequentially (Cell 1-8)
-6. View outputs and `pipeline_report.json` for metrics
+### Option 1: Interactive Mode (Recommended for Testing)
 
-### Generated Outputs
-After successful execution:
-- **filtered.jsonl** - Thai-language filtered data (≥70% Thai characters)
-- **route_train.csv** - Routing dataset for classification training
-- **pipeline_report.json** - Complete execution metrics and statistics
-- **qa_responses.json** - QA pairs extracted from filtered data
+Generate Thai QA examples with an interactive terminal interface:
 
-### Sample Results
-Typical run metrics:
-- Raw examples processed: 5+
-- Thai answer rate: 100%
-- Average quality score: 12.8/100
-- Processing time: <1 minute (CPU); faster with GPU
-- **GPU Auto-Detection:** If a CUDA-capable GPU is available, it will be automatically used for faster inference. No configuration needed.
+```bash
+python chitchat_api/synthetic/generate_typhoon.py --interactive
+```
+
+Then follow the prompts:
+- Model: `typhoon-ai/llama3.2-typhoon2-3b`
+- Task: `4` (for QA) or `1` (for all)
+- Examples: `5` (quick test) or `50` (full batch)
+- Device: `1` (auto-detect)
+- Start: `y`
+
+Expected time: 2-5 minutes for 5 examples, 30+ minutes for 50 examples.
+
+### Option 2: Run the Complete Pipeline
+
+1. Open `Thai_synthetic_data_generated.ipynb` in Jupyter
+2. Configure settings in Cell 2 (model name, device, API URL)
+3. Ensure `raw.jsonl` exists with source examples
+4. Run all cells sequentially
+
+### Expected Output
+- `raw.jsonl` - Generated synthetic data
+- `filtered.jsonl` - Thai-language filtered data (≥70% Thai chars)
+- Quality metrics:
+  - Thai Answer Rate: >96%
+  - Average Quality Score: >85/100
+
+## Interactive QA Generation
+
+Generate Thai synthetic QA examples using an interactive terminal interface:
+
+### Run Interactive Mode
+
+```bash
+python chitchat_api/synthetic/generate_typhoon.py --interactive
+```
+
+### Step-by-Step Guide
+
+The script will prompt you for:
+
+1. **Model Name** (required)
+   ```
+   [*] Model name: typhoon-ai/llama3.2-typhoon2-3b
+   ```
+
+2. **Seeds File Path** (default provided)
+   ```
+   [*] Seeds file path [chitchat_api/synthetic/seeds_thai.json]: 
+   (Press Enter to use default)
+   ```
+
+3. **Output JSONL Path** (where to save results)
+   ```
+   [*] Output JSONL file path [raw.jsonl]: qa_examples.jsonl
+   ```
+
+4. **Task Type** (what to generate)
+   ```
+   [Task Type]
+   1. all      - Generate route, chitchat, QA
+   2. route    - Generate routing examples only
+   3. chitchat - Generate chitchat examples only
+   4. qa       - Generate QA examples only
+   
+   Select [1-4] or type (all/route/chitchat/qa) [1]: 4
+   ```
+
+5. **Number of Examples** (quick test: use 5)
+   ```
+   [*] Number of examples per category [50]: 5
+   ```
+
+6. **Max Tokens Per Example** (default 512 is good)
+   ```
+   [*] Max tokens per example [512]: 
+   (Press Enter for default)
+   ```
+
+7. **Temperature** (default 0.7 balances creativity and consistency)
+   ```
+   [*] Temperature (0.1-2.0) [0.7]: 
+   (Press Enter for default)
+   ```
+
+8. **Device** (GPU or CPU)
+   ```
+   [Device]
+   1. auto  - Auto-detect GPU/CPU
+   2. cuda  - Force GPU (if available)
+   3. cpu   - Force CPU only
+   
+   Select [1-3] or type (auto/cuda/cpu) [1]: 1
+   ```
+
+9. **Data Type** (precision level)
+   ```
+   [Data Type]
+   1. auto     - Auto-detect (recommended)
+   2. float16  - Half precision (faster, less memory)
+   3. float32  - Full precision (more memory)
+   
+   Select [1-3] or type (auto/float16/float32) [1]: 1
+   ```
+
+10. **Min Thai Character Ratio** (quality filter)
+    ```
+    [*] Min Thai character ratio (0.0-1.0) [0.70]:
+    (Press Enter for default - requires 70% Thai)
+    ```
+
+11. **Confirmation** (review and start)
+    ```
+    Configuration Summary:
+    ======================================================================
+    Model:          typhoon-ai/llama3.2-typhoon2-3b
+    Seeds:          chitchat_api/synthetic/seeds_thai.json
+    Output:         qa_examples.jsonl
+    Task:           qa
+    Examples:       5 per category
+    Max Tokens:     512
+    Temperature:    0.7
+    Device:         auto
+    Data Type:      auto
+    Thai Ratio:     0.7
+    ======================================================================
+    
+    [?] Start generation? (y/n) [y]: y
+    ```
+
+### Expected Output
+
+Generated file (`qa_examples.jsonl`) with entries like:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "task_type": "qa",
+  "user": "บอกความหมายของการลงทุนในหุ้น",
+  "assistant": "การลงทุนในหุ้นคือการซื้อส่วนแบ่ง (share) ของบริษัท เพื่อให้คุณมีส่วนได้ส่วนเสีย ในกำไร/ขาดทุนของบริษัทนั้น...",
+  "label": "qa_mode",
+  "style": null,
+  "tags": ["gen", "financial"],
+  "source": "synthetic",
+  "quality_score": 0.92
+}
+```
+
+### Verify Quality
+
+View the generated data:
+```powershell
+Get-Content qa_examples.jsonl -Head 3
+```
+
+Or parse as JSON:
+```powershell
+Get-Content qa_examples.jsonl | ConvertFrom-Json | Format-List
+```
+
+### Command-Line Mode (Alternative)
+
+If you prefer non-interactive mode:
+
+```bash
+python chitchat_api/synthetic/generate_typhoon.py \
+    --model typhoon-ai/llama3.2-typhoon2-3b \
+    --task qa \
+    --n 10 \
+    --out qa_examples.jsonl \
+    --device auto \
+    --dtype float16
+```
+
+### Quick Test Settings
+
+For a fast validation test (2-3 minutes):
+```
+Model: typhoon-ai/llama3.2-typhoon2-3b
+Task: qa (option 4)
+Examples: 5
+Tokens: 512
+Temperature: 0.7
+Device: auto
+Data Type: auto
+Thai Ratio: 0.70
+```
+
+### Next: Filter & Evaluate
+
+After generation, filter the data:
+```bash
+python chitchat_api/synthetic/filter_thai.py \
+    --input qa_examples.jsonl \
+    --output filtered_qa.jsonl \
+    --min-ratio 0.70
+```
+
+Then evaluate with the API:
+```bash
+python chitchat_api/eval/eval_thai_api.py \
+    --base-url http://127.0.0.1:3001 \
+    --jsonl filtered_qa.jsonl
+```
 
 ## Project Structure
 
@@ -95,20 +281,18 @@ raw.jsonl                             # Input data (not in repo)
 
 ## Configuration
 
-Default configuration in Cell 1 of `Thai_synthetic_data_generated.ipynb`:
+Edit Cell 2 in `Thai_synthetic_data_generated.ipynb`:
 ```python
 CONFIG = {
-    'model_name': 'Typhoon-1.0-3b',
-    'device': 'cuda' if torch.cuda.is_available() else 'cpu',  # Auto-detects GPU if available
-    'api_url': 'http://127.0.0.1:3001',
-    'raw_data_path': 'raw.jsonl',                             # Provided in repo
-    'thai_char_threshold': 70.0,                              # Minimum Thai %
-    'min_text_length': 10,
-    'max_text_length': 100
+    "MODEL_NAME": "typhoon-ai/llama3.2-typhoon2-3b",
+    "DEVICE": "cuda",  # or "cpu" if no GPU
+    "DTYPE": "float16",
+    "API_BASE_URL": "http://127.0.0.1:3001",
+    "MAX_NEW_TOKENS": 96,
+    "N_EXAMPLES": 20,
+    "MIN_THAI_RATIO": 0.70,
 }
 ```
-
-**Note:** `raw.jsonl` is included in the project; no additional configuration needed. GPU support is automatic—if you have a CUDA-capable GPU (NVIDIA), it will be detected and used automatically.
 
 ## Dependencies
 
@@ -124,39 +308,101 @@ CONFIG = {
 
 ## Troubleshooting
 
-- **ModuleNotFoundError**: Install requirements: `pip install -r chitchat_api/requirements.txt`
-- **Jupyter not found**: Install with `pip install jupyter ipykernel`
-- **Notebook kernel issues**: Restart VS Code Jupyter server or use command palette: "Jupyter: Select Kernel"
-- **GPU not detected**: Pipeline runs on CPU; GPU is optional for faster inference
-- **Elasticsearch connection error**: Elasticsearch is optional; pipeline works without it
+### ModuleNotFoundError: No module named 'torch'
 
-## Verification Checklist
+**Solution:** Reinstall dependencies:
+```bash
+pip install -r chitchat_api/requirements.txt
+```
 
-After running the notebook:
-- [ ] All 8 cells executed without errors
-- [ ] `filtered.jsonl` exists (1+ KB)
-- [ ] `route_train.csv` exists with headers + data
-- [ ] `pipeline_report.json` shows "COMPLETED" status
-- [ ] Quality metrics show >90% Thai answer rate
+### CUDA/GPU Not Found
 
-## Next Steps (Optional)
+**Solution:** Use CPU mode in CONFIG:
+```python
+CONFIG["DEVICE"] = "cpu"
+```
 
-1. Start the API server: `python chitchat_api/bot_api.py`
-2. Test endpoints: `curl http://127.0.0.1:3001/health`
-3. Fine-tune classification model using `route_train.csv`
-4. Deploy filtered data to production
+Or install CUDA and PyTorch:
+- [NVIDIA CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
+- [PyTorch Installation](https://pytorch.org/get-started/locally/)
 
-## Project Details
+### Elasticsearch Connection Error
 
-- **Language**: Python 3.8+
-- **Framework**: PyTorch, FastAPI, Jupyter
-- **Data Format**: JSONL input, CSV/JSON outputs
-- **Processing**: Single-threaded, ~seconds per 100 examples
+**Solution:** Start Elasticsearch with Docker:
+```bash
+docker-compose -f chitchat_api/docker-compose.yml up -d
+docker ps  # Verify running
+```
+
+### Port 3001 Already in Use
+
+**Solution:** Change the API port:
+```python
+CONFIG["API_BASE_URL"] = "http://127.0.0.1:3002"
+```
+
+### OutOfMemory Error on GPU
+
+**Solution:** Reduce parameters or use float16:
+```python
+CONFIG["DTYPE"] = "float16"  # Reduces memory by 50%
+CONFIG["MAX_NEW_TOKENS"] = 64  # Shorter generations
+```
+
+## Next Steps
+
+1. **Interactive QA Generation (Recommended for Testing):**
+   ```bash
+   python chitchat_api/synthetic/generate_typhoon.py --interactive
+   # Follow the prompts for model name, task type, examples, etc.
+   ```
+
+2. **Generate Raw Data (Command-Line Mode):**
+   ```bash
+   python chitchat_api/synthetic/generate_typhoon.py \
+       --model typhoon-ai/llama3.2-typhoon2-3b \
+       --task qa \
+       --n 20 \
+       --out chitchat_api/data/thai_synth/raw.jsonl
+   ```
+
+3. **Filter for Quality:**
+   ```bash
+   python chitchat_api/synthetic/filter_thai.py \
+       --input raw.jsonl \
+       --output filtered.jsonl \
+       --min-ratio 0.70
+   ```
+
+4. **Start API Server:**
+   ```bash
+   python chitchat_api/bot_api.py
+   ```
+
+5. **Evaluate Generated Examples:**
+   ```bash
+   python chitchat_api/eval/eval_thai_api.py \
+       --base-url http://127.0.0.1:3001 \
+       --jsonl filtered.jsonl
+   ```
+
+6. **Run Complete Pipeline:**
+   ```bash
+   jupyter notebook Thai_synthetic_data_generated.ipynb
+   ```
+
+7. **Fine-tune Models:**
+   - Use `route_train.csv` for classification fine-tuning
+   - Use `filtered.jsonl` for QA model fine-tuning
 
 ## License
 
-MIT License - Feel free to use and modify
+MIT License - See [LICENSE](LICENSE) file for details.
 
-## Author Contact
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, subject to the following conditions.
 
-For questions or contributions, please open an issue in the repository.
+## Contact
+
+- **Author:** Rapeepat Ounkhom (AimAim25475)
+- **GitHub:** [AimAim25475](https://github.com/AimAim25475)
+- **Issues:** For bugs and feature requests, please open an [issue](https://github.com/AimAim25475/thai_synthetic_data_generator/issues)
