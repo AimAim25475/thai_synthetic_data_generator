@@ -19,7 +19,7 @@ This project automates the creation and validation of high-quality Thai syntheti
 
 ### Optional
 - Docker & Docker Compose (for Elasticsearch-based QA evaluation)
-- CUDA-capable GPU (recommended for faster LLM inference; CPU works fine for demo)
+- CUDA GPU (optional; automatically detected and used if available for faster inference)
 
 ## Installation
 
@@ -67,7 +67,8 @@ Typical run metrics:
 - Raw examples processed: 5+
 - Thai answer rate: 100%
 - Average quality score: 12.8/100
-- Processing time: <1 minute
+- Processing time: <1 minute (CPU); faster with GPU
+- **GPU Auto-Detection:** If a CUDA-capable GPU is available, it will be automatically used for faster inference. No configuration needed.
 
 ## Project Structure
 
@@ -98,7 +99,7 @@ Default configuration in Cell 1 of `Thai_synthetic_data_generated.ipynb`:
 ```python
 CONFIG = {
     'model_name': 'Typhoon-1.0-3b',
-    'device': 'cuda' if torch.cuda.is_available() else 'cpu',  # Auto-detects GPU
+    'device': 'cuda' if torch.cuda.is_available() else 'cpu',  # Auto-detects GPU if available
     'api_url': 'http://127.0.0.1:3001',
     'raw_data_path': 'raw.jsonl',                             # Provided in repo
     'thai_char_threshold': 70.0,                              # Minimum Thai %
@@ -107,7 +108,7 @@ CONFIG = {
 }
 ```
 
-**Note:** `raw.jsonl` is included in the project; no additional files needed.
+**Note:** `raw.jsonl` is included in the project; no additional configuration needed. GPU support is automatic—if you have a CUDA-capable GPU (NVIDIA), it will be detected and used automatically.
 
 ## Dependencies
 
