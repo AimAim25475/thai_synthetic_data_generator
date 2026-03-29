@@ -1,0 +1,41 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+ENV/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+models_trained/
+data/thai_synth/
+*.log
+save_qa_log.txt
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# CSV files (generated)
+**/small_bot_result*.csv
+**/eval_qa_responses*.csv
+**/eval_qa_responses*.json
+
+# Docker
+.env
+.env.local

@@ -1,0 +1,7 @@
+pythainlp
+fastapi==0.92.0
+numpy
+pandas
+# farm-haystack[all]
+uvicorn
+# pyword  # unused; also not available on PyPI in many environments

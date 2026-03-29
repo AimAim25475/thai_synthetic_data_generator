@@ -1,0 +1,6 @@
+# Optional QA dependencies (Haystack + Elasticsearch integration)
+# Install with: python -m pip install -r requirements-qa.txt
+farm-haystack[elasticsearch]
+
+# farm-haystack 1.x is not compatible with the newest transformers releases.
+transformers==4.46.3
