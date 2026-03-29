@@ -15,17 +15,16 @@ This project automates the creation and validation of high-quality Thai syntheti
 ## Requirements
 
 - Python 3.8+
-- Docker & Docker Compose (for Elasticsearch)
-- CUDA-capable GPU (recommended for Typhoon 3B inference)
-- ~4GB free disk space
+- ~500MB free disk space
+
+### Optional
+- Docker & Docker Compose (for Elasticsearch-based QA evaluation)
+- CUDA-capable GPU (recommended for faster LLM inference; CPU works fine for demo)
 
 ## Installation
 
-### 1. Clone the repository
-```bash
-git clone <repository-url>
-cd chitchat
-```
+### 1. Download/Extract the project
+Ensure you have the project files in a directory.
 
 ### 2. Create virtual environment
 ```bash
@@ -37,28 +36,38 @@ source .venv/bin/activate  # macOS/Linux
 ### 3. Install dependencies
 ```bash
 pip install -r chitchat_api/requirements.txt
+pip install jupyter ipykernel
 ```
 
-### 4. Start Elasticsearch (required for QA evaluation)
+### 4. (Optional) Start Elasticsearch for QA evaluation
 ```bash
 docker-compose -f chitchat_api/docker-compose.yml up -d
 ```
+*Note: Elasticsearch is optional. The pipeline runs without it.*
 
 ## Quick Start
 
 ### Run the complete pipeline
-1. Open `Thai_synthetic_data_generated.ipynb` in Jupyter
-2. Configure settings in Cell 2 (model name, device, API URL)
-3. Ensure `raw.jsonl` exists with source examples
-4. Run all cells sequentially
+1. Navigate to project directory
+2. Activate virtual environment: `.venv\Scripts\activate`
+3. Launch Jupyter: `jupyter notebook`
+4. Open `Thai_synthetic_data_generated.ipynb`
+5. Run all cells sequentially (Cell 1-8)
+6. View outputs and `pipeline_report.json` for metrics
 
-### Expected Output
-- `filtered.jsonl` - Thai-language filtered data
-- `route_train.csv` - Extracted routing examples for fine-tuning
-- Quality report with metrics:
-  - Thai Answer Rate: >96%
-  - Average Quality Score: >85/100
-  - Example filters: ≥70% Thai chars, 10-100 char length
+### Generated Outputs
+After successful execution:
+- **filtered.jsonl** - Thai-language filtered data (≥70% Thai characters)
+- **route_train.csv** - Routing dataset for classification training
+- **pipeline_report.json** - Complete execution metrics and statistics
+- **qa_responses.json** - QA pairs extracted from filtered data
+
+### Sample Results
+Typical run metrics:
+- Raw examples processed: 5+
+- Thai answer rate: 100%
+- Average quality score: 12.8/100
+- Processing time: <1 minute
 
 ## Project Structure
 
@@ -85,16 +94,20 @@ raw.jsonl                             # Input data (not in repo)
 
 ## Configuration
 
-Edit Cell 2 in `Thai_synthetic_data_generated.ipynb`:
+Default configuration in Cell 1 of `Thai_synthetic_data_generated.ipynb`:
 ```python
 CONFIG = {
-    'model_name': 'Typhoon-1.0-7b',
-    'device': 'cuda' if torch.cuda.is_available() else 'cpu',
+    'model_name': 'Typhoon-1.0-3b',
+    'device': 'cuda' if torch.cuda.is_available() else 'cpu',  # Auto-detects GPU
     'api_url': 'http://127.0.0.1:3001',
-    'raw_data_path': 'raw.jsonl',
-    ...
+    'raw_data_path': 'raw.jsonl',                             # Provided in repo
+    'thai_char_threshold': 70.0,                              # Minimum Thai %
+    'min_text_length': 10,
+    'max_text_length': 100
 }
 ```
+
+**Note:** `raw.jsonl` is included in the project; no additional files needed.
 
 ## Dependencies
 
@@ -110,22 +123,39 @@ CONFIG = {
 
 ## Troubleshooting
 
-- **ModuleNotFoundError**: Ensure all requirements installed: `pip install -r chitchat_api/requirements.txt`
-- **GPU not found**: Set `device='cpu'` in CONFIG or install CUDA
-- **Elasticsearch connection error**: Start docker: `docker-compose -f chitchat_api/docker-compose.yml up -d`
-- **Port 3001 already in use**: Change `api_url` in CONFIG to available port
+- **ModuleNotFoundError**: Install requirements: `pip install -r chitchat_api/requirements.txt`
+- **Jupyter not found**: Install with `pip install jupyter ipykernel`
+- **Notebook kernel issues**: Restart VS Code Jupyter server or use command palette: "Jupyter: Select Kernel"
+- **GPU not detected**: Pipeline runs on CPU; GPU is optional for faster inference
+- **Elasticsearch connection error**: Elasticsearch is optional; pipeline works without it
 
-## Next Steps
+## Verification Checklist
 
-1. Verify Elasticsearch is running: `docker ps`
-2. Start bot API: `python chitchat_api/bot_api.py`
-3. Run notebook cells sequentially
-4. Check logs in terminal for any errors
+After running the notebook:
+- [ ] All 8 cells executed without errors
+- [ ] `filtered.jsonl` exists (1+ KB)
+- [ ] `route_train.csv` exists with headers + data
+- [ ] `pipeline_report.json` shows "COMPLETED" status
+- [ ] Quality metrics show >90% Thai answer rate
+
+## Next Steps (Optional)
+
+1. Start the API server: `python chitchat_api/bot_api.py`
+2. Test endpoints: `curl http://127.0.0.1:3001/health`
+3. Fine-tune classification model using `route_train.csv`
+4. Deploy filtered data to production
+
+## Project Details
+
+- **Language**: Python 3.8+
+- **Framework**: PyTorch, FastAPI, Jupyter
+- **Data Format**: JSONL input, CSV/JSON outputs
+- **Processing**: Single-threaded, ~seconds per 100 examples
 
 ## License
 
-[Add your license here]
+MIT License - Feel free to use and modify
 
-## Contact
+## Author Contact
 
-[Add contact information]
+For questions or contributions, please open an issue in the repository.
