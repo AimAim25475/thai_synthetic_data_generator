@@ -22,12 +22,12 @@ def _fingerprint(ex: dict) -> str:
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Filter Thai synthetic dataset (language gate + dedupe).")
     ap.add_argument("--in", dest="in_path", required=True, help="Input JSONL")
     ap.add_argument("--out", dest="out_path", required=True, help="Output JSONL")
     ap.add_argument("--min-thai-ratio", type=float, default=0.70, help="Minimum Thai char ratio")
-    args = ap.parse_args()
+    args = ap.parse_args(argv)
 
     in_path = Path(args.in_path)
     out_path = Path(args.out_path)
