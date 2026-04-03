@@ -41,6 +41,10 @@ class GenConfig:
 
 _JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 
+# Short delay between generation retries (50 ms) to avoid hammering the GPU
+# on back-to-back failures (e.g. CUDA stream errors or token-limit overflows).
+_RETRY_BACKOFF_SECONDS = 0.05
+
 
 def _pick_device(device: str) -> str:
     if device == "cpu":
@@ -211,6 +215,84 @@ def _generate_one(
     return decoded.strip()
 
 
+def _create_fallback(
+    task_type: str,
+    label: str,
+    style: str | None,
+    seed_user: str,
+) -> dict[str, Any]:
+    """Return a minimal seed-based example used when all generation attempts fail."""
+    return {
+        "id": str(uuid.uuid4()),
+        "task_type": task_type,
+        "user": seed_user,
+        "assistant": None if task_type != "chitchat" else "สวัสดี เราคุยกันได้เลยนะ",
+        "label": label,
+        "style": style,
+        "tags": ["fallback"],
+        "source": "seed_fallback",
+    }
+
+
+def generate_with_retry(
+    model,
+    tokenizer,
+    prompt: str,
+    cfg: GenConfig,
+    task_type: str,
+    label: str,
+    style: str | None,
+    seed_user: str,
+    min_thai_ratio: float,
+    max_attempts: int = 3,
+) -> dict[str, Any] | None:
+    """Try up to *max_attempts* times to generate a valid, Thai-language example.
+
+    Why retry?
+    ----------
+    LLMs are probabilistic: on any single call the model may produce output that
+    is malformed JSON, fails schema validation, or contains too little Thai text.
+    Retrying with a short back-off (50 ms) gives the model additional chances to
+    produce a usable result before we fall back to a plain seed example.  Without
+    retries, transient failures (truncated JSON, wrong field values, non-Thai
+    completions) would silently degrade dataset quality.
+
+    Returns the validated example dict, or a fallback seed dict if every attempt
+    fails.  Returns ``None`` only if the fallback itself does not pass the Thai
+    gate (which should not happen for well-formed Thai seeds).
+    """
+    for attempt in range(max_attempts):
+        try:
+            completion = _generate_one(model, tokenizer, prompt, cfg)
+            obj = _extract_json(completion)
+            if not isinstance(obj, dict):
+                raise ValueError("No JSON object found in completion")
+
+            ex = _ensure_fields(obj)
+            if not ex:
+                raise ValueError("Generated example failed schema validation")
+
+            # Force the requested task/label/style in case the model deviated.
+            ex["task_type"] = task_type
+            ex["label"] = label
+            ex["style"] = style
+
+            if not _thai_gate(ex, min_thai_ratio):
+                raise ValueError("Generated example did not pass Thai character ratio gate")
+
+            ex["tags"] = list(dict.fromkeys(["gen"] + (ex.get("tags") or [])))
+            return ex
+
+        except (ValueError, RuntimeError, OSError, KeyError, TypeError):
+            if attempt < max_attempts - 1:
+                time.sleep(_RETRY_BACKOFF_SECONDS)  # 50 ms back-off before the next attempt
+            else:
+                fallback = _create_fallback(task_type, label, style, seed_user)
+                if _thai_gate(fallback, min_thai_ratio):
+                    return fallback
+                return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Generate Thai synthetic JSONL using a local HF <=7B model.")
     ap.add_argument("--model", default=os.getenv("TEACHER_MODEL_NAME", ""), help="HF model name/path (<=7B)")
@@ -308,49 +390,21 @@ def main() -> int:
                 task_type, label, style, seed_user = pool[i % len(pool)]
                 prompt = _build_prompt(task_type, label, style, seed_user)
 
-                ok = False
-                for attempt in range(args.retries):
-                    completion = _generate_one(model, tokenizer, prompt, gen_cfg)
-                    obj = _extract_json(completion)
-                    if not isinstance(obj, dict):
-                        time.sleep(0.05)
-                        continue
-
-                    ex = _ensure_fields(obj)
-                    if not ex:
-                        time.sleep(0.05)
-                        continue
-
-                    # Force requested task/label/style if model deviated
-                    ex["task_type"] = task_type
-                    ex["label"] = label
-                    ex["style"] = style
-
-                    if not _thai_gate(ex, args.min_thai_ratio):
-                        time.sleep(0.05)
-                        continue
-
-                    ex["tags"] = list(dict.fromkeys(["gen"] + (ex.get("tags") or [])))
+                ex = generate_with_retry(
+                    model,
+                    tokenizer,
+                    prompt,
+                    gen_cfg,
+                    task_type=task_type,
+                    label=label,
+                    style=style,
+                    seed_user=seed_user,
+                    min_thai_ratio=args.min_thai_ratio,
+                    max_attempts=args.retries,
+                )
+                if ex is not None:
                     fout.write(json.dumps(ex, ensure_ascii=False) + "\n")
                     written += 1
-                    ok = True
-                    break
-
-                if not ok:
-                    # As a fallback, emit a seed example so the pipeline continues.
-                    fallback = {
-                        "id": str(uuid.uuid4()),
-                        "task_type": task_type,
-                        "user": seed_user,
-                        "assistant": None if task_type != "chitchat" else "สวัสดี เราคุยกันได้เลยนะ",
-                        "label": label,
-                        "style": style,
-                        "tags": ["fallback"],
-                        "source": "seed_fallback",
-                    }
-                    if _thai_gate(fallback, args.min_thai_ratio):
-                        fout.write(json.dumps(fallback, ensure_ascii=False) + "\n")
-                        written += 1
 
     print(f"Wrote {written} examples to {out_path}")
     print("Next: run synthetic/filter_thai.py and eval/eval_thai_api.py")
